@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,6 +15,7 @@ export function FridgesManager() {
   const [fridgeName, setFridgeName] = useState("")
   const [zoneNames, setZoneNames] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -85,6 +87,45 @@ export function FridgesManager() {
     }
   }
 
+  async function deleteZone(zone: Zone, fridgeName: string) {
+    if (
+      !confirm(
+        `確定要刪除「${fridgeName}」的區域「${zone.name}」？\n若該區仍有食材，將無法刪除。`
+      )
+    ) {
+      return
+    }
+    setError(null)
+    setDeletingId(zone.id)
+    try {
+      const supabase = createClient()
+      const { count, error: countErr } = await supabase
+        .from("items")
+        .select("id", { count: "exact", head: true })
+        .eq("zone_id", zone.id)
+      if (countErr) {
+        setError(countErr.message)
+        return
+      }
+      if ((count ?? 0) > 0) {
+        setError(
+          `無法刪除：此區域內仍有 ${count} 筆食材，請先到「食材」移動或刪除後再試。`
+        )
+        return
+      }
+      const { error: delErr } = await supabase.from("zones").delete().eq("id", zone.id)
+      if (delErr) {
+        setError(delErr.message)
+        return
+      }
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "刪除區域失敗")
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   if (loading) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">載入中…</p>
@@ -139,9 +180,20 @@ export function FridgesManager() {
                       {f.zones.map((z) => (
                         <li
                           key={z.id}
-                          className="rounded-full border bg-muted/50 px-3 py-1 text-sm"
+                          className="inline-flex max-w-full items-center gap-1 rounded-full border bg-muted/50 py-1 pl-3 pr-1 text-sm"
                         >
-                          {z.name}
+                          <span className="truncate">{z.name}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+                            disabled={deletingId === z.id}
+                            aria-label={`刪除區域 ${z.name}`}
+                            onClick={() => deleteZone(z, f.name)}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
                         </li>
                       ))}
                     </ul>

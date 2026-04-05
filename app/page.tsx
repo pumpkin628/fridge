@@ -1,65 +1,114 @@
-import Image from "next/image";
+import Link from "next/link"
+import { Refrigerator, Search, ListPlus } from "lucide-react"
+import { createClient } from "@/lib/supabase/server"
+import { SetupWarning } from "@/components/setup-warning"
+import { buttonVariants } from "@/components/ui/button-variants"
+import { cn } from "@/lib/utils"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 
-export default function Home() {
+export const dynamic = "force-dynamic"
+
+export default async function HomePage() {
+  const supabase = await createClient()
+
+  let fridgeCount = 0
+  let itemCount = 0
+  let loadError: string | null = null
+
+  if (supabase) {
+    const [fridgesRes, itemsRes] = await Promise.all([
+      supabase.from("fridges").select("id", { count: "exact", head: true }),
+      supabase.from("items").select("id", { count: "exact", head: true }),
+    ])
+    if (fridgesRes.error) loadError = fridgesRes.error.message
+    else if (itemsRes.error) loadError = itemsRes.error.message
+    else {
+      fridgeCount = fridgesRes.count ?? 0
+      itemCount = itemsRes.count ?? 0
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="mx-auto flex w-full max-w-lg flex-col gap-6 p-4">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">家庭食材管理</h1>
+        <p className="text-sm text-muted-foreground">
+          記錄放在哪台冰箱、哪個區域，並追蹤剩餘數量。
+        </p>
+      </header>
+
+      {!supabase ? (
+        <SetupWarning />
+      ) : loadError ? (
+        <Card className="border-destructive/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-destructive">
+              無法讀取資料
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            {loadError}。請確認已執行 <code className="text-xs">supabase/schema.sql</code>{" "}
+            且環境變數正確。
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <Card>
+            <CardHeader className="pb-1">
+              <CardDescription>冰箱</CardDescription>
+              <CardTitle className="text-3xl tabular-nums">{fridgeCount}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-1">
+              <CardDescription>食材筆數</CardDescription>
+              <CardTitle className="text-3xl tabular-nums">{itemCount}</CardTitle>
+            </CardHeader>
+          </Card>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      )}
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium text-muted-foreground">快速操作</h2>
+        <div className="grid gap-3">
+          <Link
+            href="/items"
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-12 justify-start gap-3 px-4 text-base"
+            )}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <Search className="size-5 shrink-0" aria-hidden />
+            查看／搜尋食材
+          </Link>
+          <Link
+            href="/items/new"
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-12 justify-start gap-3 px-4 text-base"
+            )}
           >
-            Documentation
-          </a>
+            <ListPlus className="size-5 shrink-0" aria-hidden />
+            新增食材
+          </Link>
+          <Link
+            href="/fridges"
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-12 justify-start gap-3 px-4 text-base"
+            )}
+          >
+            <Refrigerator className="size-5 shrink-0" aria-hidden />
+            管理冰箱與區域
+          </Link>
         </div>
-      </main>
-    </div>
-  );
+      </section>
+    </main>
+  )
 }

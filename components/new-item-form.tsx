@@ -1,16 +1,17 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { GroceryVoiceHelper } from "@/components/grocery-voice-helper"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/client"
+import type { ParseInventoryResponse } from "@/lib/inventory-parse"
+import { ITEM_UNITS, coerceItemUnit } from "@/lib/item-units"
 import type { FridgeWithZones } from "@/lib/types"
-
-const UNITS = ["包", "盒", "瓶", "顆", "公斤", "公克", "份", "個", "條", "罐"]
 
 function zonesForFridge(fridges: FridgeWithZones[], fridgeId: string) {
   return fridges.find((f) => f.id === fridgeId)?.zones ?? []
@@ -39,6 +40,26 @@ export function NewItemForm({ fridges }: Props) {
   const [notes, setNotes] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const applyFromAi = useCallback(
+    (p: ParseInventoryResponse) => {
+      setName(p.name)
+      setQuantity(String(p.quantity))
+      setUnit(coerceItemUnit(p.unit))
+      if (p.fridge_id && fridges.some((f) => f.id === p.fridge_id)) {
+        setFridgeId(p.fridge_id)
+        const zs = zonesForFridge(fridges, p.fridge_id)
+        if (p.zone_id && zs.some((z) => z.id === p.zone_id)) {
+          setZoneId(p.zone_id)
+        } else {
+          setZoneId(zs[0]?.id ?? "")
+        }
+      }
+      setPurchaseDate(p.purchase_date ?? "")
+      setNotes(p.notes ?? "")
+    },
+    [fridges]
+  )
 
   function syncZoneWhenFridgeChanges(nextFridgeId: string) {
     setFridgeId(nextFridgeId)
@@ -101,7 +122,9 @@ export function NewItemForm({ fridges }: Props) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <div className="space-y-5">
+      <GroceryVoiceHelper fridges={fridges} onApply={applyFromAi} />
+      <form onSubmit={onSubmit} className="space-y-5">
       <div className="space-y-2">
         <Label htmlFor="name">名稱</Label>
         <Input
@@ -132,7 +155,7 @@ export function NewItemForm({ fridges }: Props) {
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
           >
-            {UNITS.map((u) => (
+            {ITEM_UNITS.map((u) => (
               <option key={u} value={u}>
                 {u}
               </option>
@@ -205,5 +228,6 @@ export function NewItemForm({ fridges }: Props) {
         {saving ? "送出中…" : "新增食材"}
       </Button>
     </form>
+    </div>
   )
 }
